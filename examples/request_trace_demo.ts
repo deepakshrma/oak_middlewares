@@ -5,16 +5,16 @@ const app = new Application();
 
 app.use(requestTraceMiddleware<Middleware>());
 app.use(
-  requestTraceMiddleware<Middleware>({ type: "combined" })
+  requestTraceMiddleware<Middleware>({ type: "combined" }),
 );
 app.use(
-  requestTraceMiddleware<Middleware>({ type: "common" })
+  requestTraceMiddleware<Middleware>({ type: "common" }),
 );
 app.use(
-  requestTraceMiddleware<Middleware>({ type: "dev" })
+  requestTraceMiddleware<Middleware>({ type: "dev" }),
 );
 app.use(
-  requestTraceMiddleware<Middleware>({ type: "short" })
+  requestTraceMiddleware<Middleware>({ type: "short" }),
 );
 
 // This will not print since log level is higher
@@ -23,7 +23,15 @@ app.use(
   requestTraceMiddleware<Middleware>({
     type: "tiny",
     loggerOptions: { level: 1 },
-  })
+  }),
+);
+
+// Disable logger, use raw console.log
+app.use(
+  requestTraceMiddleware<Middleware>({
+    type: "tiny",
+    raw: true,
+  }),
 );
 
 app.use((ctx) => {

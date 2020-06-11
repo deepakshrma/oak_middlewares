@@ -1,11 +1,18 @@
 import { Middleware } from "https://deno.land/x/oak/mod.ts";
 import { Logger, LoggerOptions } from "https://deno.land/x/deno_util/logger.ts";
 
+/**
+ * Extract token value from request, response
+ *
+ * @param request
+ * @param response
+ * @param tokenString {""}
+ */
 const parseToken = (request: any, response: any, tokenString = "") => {
   const tokens = tokenString.split(" ").reduce((tokens: any, token: string) => {
     switch (token) {
       case ":method":
-        tokens[token] = request.method.toString();
+        tokens[token] = String(request.method);
         break;
       case ":remote-addr":
         tokens[token] = request.headers.get("host");
@@ -21,7 +28,7 @@ const parseToken = (request: any, response: any, tokenString = "") => {
         tokens[token] = request.url.pathname;
         break;
       case ":status":
-        tokens[token] = response.status.toString();
+        tokens[token] = String(response.status);
         break;
       case ":content-length":
         tokens[token] = response.body?.toString().length.toString() || "0";
@@ -31,32 +38,54 @@ const parseToken = (request: any, response: any, tokenString = "") => {
   }, {});
   return tokens;
 };
-export const requestTraceMiddleware = <T>(
-  {
-    type = "tiny",
-    loggerOptions = {},
-  }: {
-    type?: "combined" | "common" | "dev" | "short" | "tiny";
-    loggerOptions?: LoggerOptions;
-  } = { type: "tiny" }
-): T | Middleware => {
+export interface Options {
+  /**
+   * type:  type of the trace log
+   *
+   * @default "tiny"
+   */
+  type?: "combined" | "common" | "dev" | "short" | "tiny";
+  /**
+   * loggerOptions: customized logger
+   *
+   * @default {}
+   */
+  loggerOptions?: LoggerOptions;
+  /**
+   * raw: use raw console.log
+   *
+   * @default false
+   */
+  raw?: boolean;
+}
+
+/**
+ * Options
+ *
+ * @param param Options
+ */
+export const requestTraceMiddleware = <T = Middleware>({
+  type = "tiny",
+  loggerOptions = {},
+  raw: disableLogger = false,
+}: Options = {}): T | Middleware => {
   const logger = new Logger(loggerOptions);
   return async function (ctx, next) {
     let formatString;
     switch (type) {
-      case "short":
+      case "combined":
         formatString =
-          ":remote-addr :method :url :status :content-length :response-time";
-        break;
-      case "dev":
-        formatString = ":method :url :status :response-time - :content-length";
+          ":remote-addr - :method :url :status :content-length :referrer :user-agent";
         break;
       case "common":
         formatString = ":remote-addr - :method :url :status :content-length";
         break;
-      case "combined":
+      case "dev":
+        formatString = ":method :url :status :response-time - :content-length";
+        break;
+      case "short":
         formatString =
-          ":remote-addr - :method :url :status :content-length :referrer :user-agent";
+          ":remote-addr :method :url :status :content-length :response-time";
         break;
       default:
         formatString = ":method :url :status :content-length :response-time";
@@ -68,11 +97,16 @@ export const requestTraceMiddleware = <T>(
     const { request, response } = ctx;
     let tokens = parseToken(request, response, formatString);
     tokens[":response-time"] = "- " + ms.toString() + "ms";
-
-    logger.info(
-      formatString.replace(/(:[\w-]+)/g, (_: any, matched: any) => {
+    const message = formatString.replace(
+      /(:[\w-]+)/g,
+      (_: any, matched: any) => {
         return tokens[matched] + " ";
-      })
+      },
     );
+    if (disableLogger) {
+      console.info(message);
+    } else {
+      logger.info(message);
+    }
   };
 };
